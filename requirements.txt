@@ -1,0 +1,16 @@
+# Core
+torch>=2.0.0
+transformers>=4.40.0
+datasets>=2.18.0
+accelerate>=0.27.0
+peft>=0.10.0
+
+# Config
+pyyaml>=6.0
+
+# Monitoring
+swanlab>=0.3.0
+
+# Optional
+bitsandbytes>=0.43.0  # For quantization
+scipy  # For some optimizers

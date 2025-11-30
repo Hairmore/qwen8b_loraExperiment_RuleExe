@@ -1,0 +1,57 @@
+# ============================================
+# Qwen-8B LoRA Fine-tuning Configuration
+# ============================================
+
+# Model Settings
+model:
+  name: "Qwen/Qwen2.5-7B-Instruct"  # 或使用本地路径
+  trust_remote_code: true
+
+# Data Settings
+data:
+  train_file: "data/train.jsonl"    # 训练数据路径
+  eval_file: "data/eval.jsonl"      # 验证数据路径 (可选)
+  max_length: 8192
+
+# LoRA Settings
+lora:
+  rank: 16
+  alpha: 32
+  dropout: 0.15
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+# Training Settings
+training:
+  batch_size: 8
+  gradient_accumulation_steps: 2    # 有效batch_size = 8 * 2 = 16
+  n_epochs: 2
+  learning_rate: 1.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.05
+  weight_decay: 0.01
+  eval_steps: 50
+  save_steps: 100
+  logging_steps: 10
+  fp16: true
+  gradient_checkpointing: true      # 节省显存
+
+# Reproducibility
+seed: 42
+
+# Output Settings
+output:
+  work_dir: "work_dirs"
+  experiment_name: null             # 留空则自动生成
+
+# SwanLab Settings
+swanlab:
+  enabled: true
+  project: "qwen8b-lora-finetune"
+  experiment_name: null             # 留空则与 output.experiment_name 一致

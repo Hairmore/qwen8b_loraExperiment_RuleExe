@@ -1,0 +1,83 @@
+============================================================
+EXPERIMENT LOG
+============================================================
+Start Time: 2025-11-30 18:58:58
+
+----------------------------------------
+1. COMMAND
+----------------------------------------
+   /media/hairmore/LaCie/qwen8b_loraExperiment_RuleExe/train_qwen8b_lora.py --config /media/hairmore/LaCie/qwen8b_loraExperiment_RuleExe/.temp_config_0.yaml
+
+----------------------------------------
+2. ENVIRONMENT
+----------------------------------------
+   Python Version:       3.10.19
+   PyTorch Version:      2.5.1+cu121
+   Transformers Version: 4.57.3
+   CUDA Version:         12.1
+   GPU Name:             NVIDIA GeForce RTX 4090
+   GPU Count:            2
+
+----------------------------------------
+3. SEED
+----------------------------------------
+   Random Seed: 42
+
+----------------------------------------
+4. GIT HASH (Code Version)
+----------------------------------------
+   Commit: unknown (DIRTY - uncommitted changes!)
+   Branch: unknown
+
+----------------------------------------
+5. CONFIG (All Hyperparameters)
+----------------------------------------
+data:
+  eval_file: null
+  max_length: 8192
+  split:
+    enabled: true
+    eval_ratio: 0.1
+    seed: 42
+  train_file: data/train.jsonl
+lora:
+  alpha: 32
+  dropout: 0.1
+  rank: 16
+  target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+model:
+  name: /media/hairmore/LaCie/qwen3-8b/Qwen3-8B
+  trust_remote_code: true
+output:
+  experiment_name: 20251130_185856_lr1e4_r16
+  work_dir: work_dirs
+seed: 42
+swanlab:
+  enabled: true
+  experiment_name: lr1e4_r16
+  project: qwen8b-lora-sweep
+training:
+  batch_size: 8
+  eval_steps: 50
+  fp16: true
+  gradient_accumulation_steps: 2
+  gradient_checkpointing: true
+  learning_rate: 0.0001
+  logging_steps: 10
+  lr_scheduler_type: cosine
+  n_epochs: 2
+  save_steps: 100
+  warmup_ratio: 0.05
+  weight_decay: 0.01
+
+
+============================================================
+TRAINING LOG
+============================================================
