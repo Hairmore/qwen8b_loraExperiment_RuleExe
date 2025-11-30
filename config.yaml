@@ -4,14 +4,14 @@
 
 # Model Settings
 model:
-  name: "Qwen/Qwen2.5-7B-Instruct"  # 或使用本地路径
+  name: "/media/hairmore/LaCie/qwen3-8b/Qwen3-8B"  # 或使用本地路径
   trust_remote_code: true
 
 # Data Settings
 data:
-  train_file: "data/train.jsonl"    # 训练数据路径
-  eval_file: "data/eval.jsonl"      # 验证数据路径 (可选)
-  max_length: 8192
+  train_file: "data/train_enesvi_nat40.jsonl"    # 训练数据路径
+  eval_file: "null"      # 验证数据路径 (可选)
+  max_length: 4092
 
 # LoRA Settings
 lora:

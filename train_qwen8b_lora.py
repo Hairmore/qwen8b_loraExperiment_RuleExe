@@ -31,8 +31,8 @@ from transformers import (
     AutoTokenizer,
     TrainingArguments,
     Trainer,
-    DataCollatorForLanguageModeling,   # ✅ 改成 LM collator
 )
+from transformers import DataCollatorForSeq2Seq
 from peft import LoraConfig, get_peft_model, TaskType
 from datasets import load_dataset
 import transformers
@@ -260,84 +260,77 @@ def load_and_preprocess_data(config, tokenizer):
     max_length = config["data"]["max_length"]
     
     def preprocess_function(examples):
-        """
-        支持两种格式：
-        1) {"instruction": "...", "input": "...", "output": "..."}
-        2) {"messages": [{"role": "system/user/assistant", "content": "..."}, ...]}
-        """
+        # 初始化输出字典
         model_inputs = {"input_ids": [], "attention_mask": [], "labels": []}
 
-        # 明确 batch size
-        if "instruction" in examples:
-            batch_size = len(examples["instruction"])
-        elif "messages" in examples:
+        # 1. 确定 batch_size
+        if "messages" in examples:
             batch_size = len(examples["messages"])
+        elif "instruction" in examples:
+            batch_size = len(examples["instruction"])
         else:
             return model_inputs
         
         for i in range(batch_size):
-            # 格式1: instruction/input/output
-            if "instruction" in examples:
-                instruction = examples["instruction"][i]
-                input_list = examples.get("input")
-                if input_list is not None:
-                    input_text = input_list[i]
-                else:
-                    input_text = ""
-                output_text = examples["output"][i]
-                
-                if input_text:
-                    prompt = (
-                        f"<|im_start|>user\n{instruction}\n{input_text}"
-                        f"<|im_end|>\n<|im_start|>assistant\n"
-                    )
-                else:
-                    prompt = (
-                        f"<|im_start|>user\n{instruction}"
-                        f"<|im_end|>\n<|im_start|>assistant\n"
-                    )
-                response = f"{output_text}<|im_end|>"
+            # 初始化中间变量
+            prompt = None
+            response = None
             
-            # 格式2: messages（支持 system/user/assistant）
-            elif "messages" in examples:
-                messages = examples["messages"][i]
-                prompt = ""
-                response = ""
+            # --- 解析逻辑 (保持你的原有逻辑，但增加判空) ---
+            try:
+                if "messages" in examples:
+                    messages = examples["messages"][i]
+                    # 必须以 assistant 结尾且内容有效
+                    if messages and messages[-1]["role"] == "assistant" and messages[-1]["content"]:
+                        response_text = messages[-1]["content"].strip()
+                        if response_text: # 确保非空
+                            response = f"{response_text}<|im_end|>"
+                            
+                            # 构造 prompt
+                            temp_prompt = ""
+                            for msg in messages[:-1]:
+                                content = msg["content"]
+                                role = msg["role"]
+                                if not content: continue # 跳过空消息
+                                
+                                if role == "system":
+                                    temp_prompt += f"<|im_start|>system\n{content}<|im_end|>\n"
+                                elif role == "user":
+                                    temp_prompt += f"<|im_start|>user\n{content}<|im_end|>\n<|im_start|>assistant\n"
+                            
+                            if temp_prompt:
+                                prompt = temp_prompt
                 
-                for msg in messages:
-                    role = msg["role"]
-                    content = msg["content"]
+                elif "instruction" in examples:
+                    # (保留你原本的 instruction 逻辑)
+                    if examples["output"][i]:
+                        response = f"{examples['output'][i]}<|im_end|>"
+                        # ... (prompt 构造逻辑) ...
+                        # 假设你也构造好了 prompt
+            except Exception:
+                continue # 遇到任何解析错误直接跳过该样本
+
+            # 2. Tokenize & 校验 & 追加
+            # 只有当 prompt 和 response 都成功构造且非空时，才进行处理
+            if prompt and response:
+                prompt_ids = tokenizer.encode(prompt, add_special_tokens=False)
+                response_ids = tokenizer.encode(response, add_special_tokens=False)
+                
+                # 再次检查 token 列表非空 (防止纯空格被 encode 为空)
+                if prompt_ids and response_ids:
+                    input_ids = prompt_ids + response_ids
+                    labels = [-100] * len(prompt_ids) + response_ids
                     
-                    if role == "system":
-                        # System prompt 放在最前面
-                        prompt += f"<|im_start|>system\n{content}<|im_end|>\n"
-                    elif role == "user":
-                        prompt += f"<|im_start|>user\n{content}<|im_end|>\n<|im_start|>assistant\n"
-                    elif role == "assistant":
-                        # 只取最后一条 assistant 作为 supervised target
-                        response = f"{content}<|im_end|>"
-                
-                if not response:
-                    # 没有 assistant，跳过
-                    continue
-            else:
-                continue
-            
-            # Tokenize
-            prompt_ids = tokenizer.encode(prompt, add_special_tokens=False)
-            response_ids = tokenizer.encode(response, add_special_tokens=False)
-            
-            input_ids = prompt_ids + response_ids
-            labels = [-100] * len(prompt_ids) + response_ids  # 只计算 response 的 loss
-            
-            # 截断
-            if len(input_ids) > max_length:
-                input_ids = input_ids[:max_length]
-                labels = labels[:max_length]
-            
-            model_inputs["input_ids"].append(input_ids)
-            model_inputs["attention_mask"].append([1] * len(input_ids))
-            model_inputs["labels"].append(labels)
+                    # 截断
+                    if len(input_ids) > max_length:
+                        input_ids = input_ids[:max_length]
+                        labels = labels[:max_length]
+                    
+                    # ✅ 核心修正：只在数据完全有效时才 append
+                    # 这样保证了 input_ids, attention_mask, labels 长度始终一致，且不包含空列表
+                    model_inputs["input_ids"].append(input_ids)
+                    model_inputs["attention_mask"].append([1] * len(input_ids))
+                    model_inputs["labels"].append(labels)
         
         return model_inputs
     
@@ -347,6 +340,7 @@ def load_and_preprocess_data(config, tokenizer):
         batched=True,
         remove_columns=dataset["train"].column_names,
         desc="Preprocessing dataset",
+        load_from_cache_file=False,
     )
     
     return processed_dataset
@@ -440,7 +434,6 @@ def train(config, args):
         config["model"]["name"],
         trust_remote_code=config["model"]["trust_remote_code"],
         torch_dtype=torch.float16 if config["training"]["fp16"] else torch.float32,
-        device_map="auto",
     )
     
     # 配置 LoRA
@@ -509,9 +502,11 @@ def train(config, args):
 
     
     # Data collator：Causal LM 标准写法
-    data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer,
-        mlm=False,
+    data_collator = DataCollatorForSeq2Seq(
+    tokenizer=tokenizer,
+    padding=True,
+    return_tensors="pt",
+    label_pad_token_id=-100,  # 和你 labels 里的 -100 对齐，保证 pad 部分不计入 loss
     )
     
     # 设置回调

@@ -21,7 +21,7 @@ base_config:
   data:
     train_file: "data/train_enesvi_nat40.jsonl"
     eval_file: null                   # null 表示从 train 切分
-    max_length: 8192
+    max_length: 4092
     split:
       enabled: true
       eval_ratio: 0.1
